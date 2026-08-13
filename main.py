@@ -4,6 +4,8 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 CRLF = "\r\n"
+FPS = 10
+GRID_SIZE = 5, 10
 
 
 class Board[T]:
@@ -92,7 +94,7 @@ class Game:
     running: bool
 
     def __init__(self) -> None:
-        w, h = 5, 10
+        w, h = GRID_SIZE
         self.x, self.y = w // 2, 0
         self.running = True
         self.board = Board(w, h)
@@ -128,7 +130,6 @@ class Game:
 def main():
     term = Terminal()
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
-        FPS = 10
         g = Game()
         while g.running:
             print(term.home + term.clear, end="")
