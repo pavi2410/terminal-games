@@ -10,11 +10,13 @@ class Board[T]:
     grid: list[T | None]
     height: int
     width: int
+    active: tuple[int, int]
 
-    def __init__(self, height: int, width: int) -> None:
+    def __init__(self, width: int, height: int) -> None:
         self.height = height
         self.width = width
         self.grid = [None] * (height * width)
+        self.active = (0, 0)
 
     def _pointer(self, i: int, j: int) -> int:
         return j * self.width + i
@@ -25,13 +27,21 @@ class Board[T]:
     def set(self, i: int, j: int, v: T | None):
         self.grid[self._pointer(i, j)] = v
 
+    def update(self, x: int, y: int):
+        self.active = (x, y)
+
+    def _is_active(self, x: int, y: int):
+        return (x, y) == self.active
+
     def render(self, term: Terminal) -> str:
         buf = ""
         for y in range(self.height):
+            ibuf = ""
             for x in range(self.width):
-                v = self.get(x, y)
-                buf += f"{term.dimgray}[{term.blue}{v or ' '}{term.dimgray}]"
-            buf += CRLF
+                v = "@" if self._is_active(x, y) else " "
+                D, B = term.dimgray, term.blue
+                ibuf += f"{D}[{B}{v}{D}]"
+            buf += term.center(ibuf) + CRLF
         return buf + term.normal
 
 
@@ -79,13 +89,19 @@ class Game:
     x: int
     y: int
     heading: RainbowText
+    running: bool
 
     def __init__(self) -> None:
-        self.x, self.y = 0, 0
-        self.board = Board(5, 5)
+        w, h = 5, 10
+        self.x, self.y = w // 2, 0
+        self.running = True
+        self.board = Board(w, h)
         self.heading = RainbowText("TETRIS")
 
     def update(self, key: Keystroke):
+        if key == "q":
+            self.running = False
+            return
         h, w = self.board.height, self.board.width
         match key.name:
             case "KEY_UP":
@@ -100,10 +116,10 @@ class Game:
                 pass
 
         self.heading.update()
-        self.board.set(self.x, self.y, 9)
+        self.board.update(self.x, self.y)
 
     def render(self, term: Terminal) -> str:
-        buf = f"{self.x!r} {self.y!r}"
+        buf = ""
         buf += self.heading.render(term)
         buf += self.board.render(term)
         return buf
@@ -114,13 +130,10 @@ def main():
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
         FPS = 10
         g = Game()
-        while True:
+        while g.running:
             print(term.home + term.clear, end="")
             print(g.render(term), end=CRLF)
             key = term.inkey(timeout=0)
-            if key == "q":
-                break
-            print(f"key pressed {key!r}", end=CRLF)
             g.update(key)
             time.sleep(1 / FPS)
 
