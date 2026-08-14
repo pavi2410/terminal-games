@@ -26,6 +26,13 @@ SHAPES: list[Shape] = [
 ]
 SYMBOLS = "#@X0"
 
+DIRS = {
+    "KEY_UP": (0, -1),
+    "KEY_DOWN": (0, 1),
+    "KEY_LEFT": (-1, 0),
+    "KEY_RIGHT": (1, 0),
+}
+
 
 def new_mat[T](size: Size, default: T) -> Mat[T]:
     M, N = size
@@ -86,11 +93,13 @@ class Board[T]:
     size: Size
     cur_piece: Piece
     placed_pieces: list[Piece]
+    _last_time: float
 
     def __init__(self, size: Size) -> None:
         self.size = size
         self.grid = new_mat(size, None)
         self.placed_pieces = []
+        self._last_time = time.perf_counter()
         self._spawn_piece()
 
     def get(self, i: int, j: int) -> T | None:
@@ -99,27 +108,37 @@ class Board[T]:
     def set(self, i: int, j: int, v: T | None):
         self.grid[i][j] = v
 
-    def update(self, key: Keystroke):
-        if key == " ":
-            self.cur_piece = self.cur_piece.rotate_cw()
-            return
-
+    def _move_piece(self, dir: Coord):
         w, h = self.size
         pw, ph = self.cur_piece.size()
         ew, eh = w - pw, h - ph
         x, y = self.cur_piece.pos
-        match key.name:
-            case "KEY_UP":
-                y = clamp(y - 1, 0, eh)
-            case "KEY_DOWN":
-                y = clamp(y + 1, 0, eh)
-            case "KEY_LEFT":
-                x = clamp(x - 1, 0, ew)
-            case "KEY_RIGHT":
-                x = clamp(x + 1, 0, ew)
-            case _:
-                pass
+        dx, dy = dir
+        x = clamp(x + dx, 0, ew)
+        y = clamp(y + dy, 0, eh)
         self.cur_piece.pos = x, y
+
+    def _fall_piece(self):
+        dir = DIRS['KEY_DOWN']
+        self._move_piece(dir)
+
+    def update(self, key: Keystroke):
+        # at every tick (each update call)
+        now = time.perf_counter()
+        dt = now - self._last_time
+        # self._last_time = now
+
+        # more than a second has passed
+        if dt >= 1:
+            self._last_time = now
+            self._fall_piece()
+
+        if key == " ":
+            self.cur_piece = self.cur_piece.rotate_cw()
+            return
+
+        if key.name and (dir := DIRS.get(key.name)):
+            self._move_piece(dir)
 
     def _spawn_piece(self):
         shape = random.choice(SHAPES)
@@ -221,13 +240,14 @@ def main():
     term = Terminal()
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
         g = Game()
+        frame_dur = 1 / FPS
         while g.running:
             print(term.home + term.clear, end="")
             buf = CRLF.join(g.render(term))
             print(buf, end=CRLF)
             key = term.inkey(timeout=0)
             g.update(key)
-            time.sleep(1 / FPS)
+            time.sleep(frame_dur)
 
 
 if __name__ == "__main__":
