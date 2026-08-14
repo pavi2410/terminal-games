@@ -13,7 +13,7 @@ type Buffer = list[str]
 
 CRLF = "\r\n"
 FPS = 10
-GRID_SIZE: Size = 5, 10
+GRID_SIZE: Size = 10, 20
 ORIGIN: Coord = 0, 0
 
 
@@ -213,8 +213,12 @@ class Game:
     def __init__(self) -> None:
         self.running = True
         self.board = Board(GRID_SIZE)
-        self.heading = RainbowText("★TETRIS★", space=1)
-        self.line = RainbowText("─" * 15)
+
+        s = "★"
+        grid_w, _ = GRID_SIZE
+        cell_w = 3
+        self.heading = RainbowText(s + "TETRIS".center(grid_w) + s, space=1)
+        self.line = RainbowText("─" * grid_w * cell_w)
 
     def update(self, key: Keystroke):
         if key == "q":
