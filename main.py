@@ -49,10 +49,12 @@ class Board[T]:
 
 class RainbowText:
     text: str
+    space: int
     tick: int
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, space: int = 0):
         self.text = text
+        self.space = space
         self.tick = 0
 
     def update(self):
@@ -74,7 +76,7 @@ class RainbowText:
         for i, b in enumerate(self.text):
             k = (-base + i) % N
             a = colors[k]
-            buf += a + b + " "
+            buf += a + b + (" " * self.space)
         return term.center(buf) + term.normal + CRLF
 
 
@@ -91,6 +93,7 @@ class Game:
     x: int
     y: int
     heading: RainbowText
+    line: RainbowText
     running: bool
 
     def __init__(self) -> None:
@@ -98,7 +101,8 @@ class Game:
         self.x, self.y = w // 2, 0
         self.running = True
         self.board = Board(w, h)
-        self.heading = RainbowText("TETRIS")
+        self.heading = RainbowText("TETRIS", space=1)
+        self.line = RainbowText("─" * 15)
 
     def update(self, key: Keystroke):
         if key == "q":
@@ -118,12 +122,16 @@ class Game:
                 pass
 
         self.heading.update()
+        self.line.update()
         self.board.update(self.x, self.y)
 
     def render(self, term: Terminal) -> str:
         buf = ""
+        buf += self.line.render(term)
         buf += self.heading.render(term)
+        buf += self.line.render(term)
         buf += self.board.render(term)
+        buf += self.line.render(term)
         return buf
 
 
