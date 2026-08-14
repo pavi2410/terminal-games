@@ -1,5 +1,7 @@
+import itertools
 import random
 import time
+from typing import cast
 
 from blessed import Terminal
 from blessed.keyboard import Keystroke
@@ -25,6 +27,7 @@ SHAPES: list[Shape] = [
     [[1, 0, 1], [1, 1, 1]],
 ]
 SYMBOLS = "#@X0"
+COLORS = ["red", "orange", "yellow", "green", "blue", "violet"]
 
 DIRS = {
     "KEY_UP": (0, -1),
@@ -77,6 +80,20 @@ class Piece:
             (x + dx, y + dy) for dx in range(M) for dy in range(N) if s[dx][dy] != 0
         ]
 
+    def top_edge_cells(self, y_offset: int = 0) -> list[Coord]:
+        cells = self.cells()
+        return [
+            (k, min(g, key=lambda c: c[1])[1] + y_offset)
+            for k, g in itertools.groupby(cells, lambda c: c[0])
+        ]
+
+    def bottom_edge_cells(self, y_offset: int = 0) -> list[Coord]:
+        cells = self.cells()
+        return [
+            (k, max(g, key=lambda c: c[1])[1] + y_offset)
+            for k, g in itertools.groupby(cells, lambda c: c[0])
+        ]
+
     def render(self, term: Terminal) -> Buffer:
         M, N = self.size()
         buf = [""] * M
@@ -119,8 +136,27 @@ class Board[T]:
         self.cur_piece.pos = x, y
 
     def _fall_piece(self):
-        dir = DIRS['KEY_DOWN']
+        dir = DIRS["KEY_DOWN"]
         self._move_piece(dir)
+
+    def _bottom_touched(self) -> bool:
+        # bottom edge cells of the current piece
+        # select the cells whose y is max
+        cpc_bottom = set(self.cur_piece.bottom_edge_cells(1))
+
+        # top edge cells of the placed pieces
+        # select the cells whose y is min
+        for piece in self.placed_pieces:
+            pc_top = set(piece.top_edge_cells())
+            if not cpc_bottom.isdisjoint(pc_top):
+                return True
+
+        # coords of the board floor
+        w, h = self.size
+        floor_cells = {(x, h) for x in range(w)}
+
+        # check overlap
+        return not cpc_bottom.isdisjoint(floor_cells)
 
     def update(self, key: Keystroke):
         # at every tick (each update call)
@@ -133,6 +169,9 @@ class Board[T]:
             self._last_time = now
             self._fall_piece()
 
+        if self._bottom_touched():
+            self._place_piece()
+
         if key == " ":
             self.cur_piece = self.cur_piece.rotate_cw()
             return
@@ -143,9 +182,10 @@ class Board[T]:
     def _spawn_piece(self):
         shape = random.choice(SHAPES)
         sym = random.choice(SYMBOLS)
+        color = random.choice(COLORS)
         w, _ = self.size
         pos = w // 2, 0
-        p = Piece(shape, pos, sym, "")
+        p = Piece(shape, pos, sym, color)
         self.cur_piece = p
 
     def _place_piece(self):
@@ -154,8 +194,13 @@ class Board[T]:
         self._spawn_piece()
 
     def _is_piece(self, x: int, y: int) -> Piece | None:
-        if (x, y) in self.cur_piece.cells():
-            return self.cur_piece
+        coord = x, y
+        cp = self.cur_piece
+        if coord in cp.cells():
+            return cp
+        for piece in self.placed_pieces:
+            if coord in piece.cells():
+                return piece
         return None
 
     def render(self, term: Terminal) -> Buffer:
@@ -164,9 +209,13 @@ class Board[T]:
         for y in range(H):
             ibuf = ""
             for x in range(W):
-                v = p.sym if (p := self._is_piece(x, y)) else " "
-                D, B = term.dimgray, term.blue
-                ibuf += f"{D}[{B}{v}{D}]"
+                D = term.dimgray
+                if p := self._is_piece(x, y):
+                    s = p.sym
+                    c = cast(str, getattr(term, p.color))
+                    ibuf += f"{D}[{c}{s}{D}]"
+                else:
+                    ibuf += f"{D}[ ]"
             buf[y] = term.center(ibuf)
         return buf
 
@@ -185,21 +234,12 @@ class RainbowText:
         self.tick += 1
 
     def render(self, term: Terminal) -> Buffer:
-        colors = [
-            term.bright_red,
-            term.bright_orange,
-            term.bright_yellow,
-            term.bright_green,
-            term.bright_blue,
-            term.bright_violet,
-        ]
-
         buf = ""
-        N = len(colors)
+        N = len(COLORS)
         base = self.tick % N
         for i, b in enumerate(self.text):
             k = (-base + i) % N
-            a = colors[k]
+            a = cast(str, getattr(term, COLORS[k]))
             buf += a + b + (" " * self.space)
         return [term.center(buf) + term.normal]
 
