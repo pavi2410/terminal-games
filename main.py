@@ -1,46 +1,145 @@
+import random
 import time
 
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
+type Size = tuple[int, int]
+type Mat[T] = list[list[T]]
+type Shape = Mat[int]
+type Coord = tuple[int, int]
+
+
 CRLF = "\r\n"
 FPS = 10
-GRID_SIZE = 5, 10
+GRID_SIZE: Size = 5, 10
+ORIGIN: Coord = 0, 0
 
 
-class Board[T]:
-    grid: list[T | None]
-    height: int
-    width: int
-    active: tuple[int, int]
+SHAPES: list[Shape] = [
+    [[1, 1, 0], [0, 1, 1]],
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[1, 0, 1], [1, 1, 1]],
+]
+SYMBOLS = "#@X0"
 
-    def __init__(self, width: int, height: int) -> None:
-        self.height = height
-        self.width = width
-        self.grid = [None] * (height * width)
-        self.active = (0, 0)
 
-    def _pointer(self, i: int, j: int) -> int:
-        return j * self.width + i
+def new_mat[T](size: Size, default: T | None = None) -> Mat[T | None]:
+    M, N = size
+    return [[default for _ in range(M)] for _ in range(N)]
 
-    def get(self, i: int, j: int) -> T | None:
-        return self.grid[self._pointer(i, j)]
 
-    def set(self, i: int, j: int, v: T | None):
-        self.grid[self._pointer(i, j)] = v
+def clamp(value: int, min_val: int, max_val: int) -> int:
+    if value < min_val:
+        return min_val
+    elif value > max_val:
+        return max_val
+    return value
 
-    def update(self, x: int, y: int):
-        self.active = (x, y)
 
-    def _is_active(self, x: int, y: int):
-        return (x, y) == self.active
+class Piece:
+    shape: Shape
+    pos: Coord
+    sym: str
+    color: str
+
+    def __init__(self, shape: list[list[int]], pos: Coord, sym: str, color: str):
+        self.shape = shape
+        self.pos = pos
+        self.sym = sym
+        self.color = color
+
+    def rotate_cw(self) -> Piece:
+        M, N = len(self.shape), len(self.shape[0])
+        new_shape = [[self.shape[M - 1 - x][y] for x in range(M)] for y in range(N)]
+        return Piece(new_shape, self.pos, self.sym, self.color)
+
+    def size(self) -> Size:
+        s = self.shape
+        M, N = len(s), len(s[0])
+        return M, N
+
+    def cells(self) -> list[Coord]:
+        s = self.shape
+        x, y = self.pos
+        M, N = len(s), len(s[0])
+        return [
+            (x + dx, y + dy) for dx in range(M) for dy in range(N) if s[dx][dy] != 0
+        ]
 
     def render(self, term: Terminal) -> str:
         buf = ""
-        for y in range(self.height):
+        M = len(self.shape)
+        N = len(self.shape[0])
+        for x in range(M):
+            for y in range(N):
+                v = self.shape[x][y]
+                c = term.red("#") if v != 0 else "."
+                buf += c
+            buf += CRLF
+        return buf
+
+
+class Board[T]:
+    grid: Mat[T | None]
+    size: Size
+    cur_piece: Piece
+    placed_pieces: list[Piece]
+
+    def __init__(self, size: Size) -> None:
+        self.size = size
+        self.grid = new_mat(size)
+        self.placed_pieces = []
+        self._spawn_piece()
+
+    def get(self, i: int, j: int) -> T | None:
+        return self.grid[i][j]
+
+    def set(self, i: int, j: int, v: T | None):
+        self.grid[i][j] = v
+
+    def update(self, key: Keystroke):
+        w, h = self.size
+        pw, ph = self.cur_piece.size()
+        ew, eh = w - pw, h - ph
+        x, y = self.cur_piece.pos
+        match key.name:
+            case "KEY_UP":
+                y = clamp(y - 1, 0, eh)
+            case "KEY_DOWN":
+                y = clamp(y + 1, 0, eh)
+            case "KEY_LEFT":
+                x = clamp(x - 1, 0, ew)
+            case "KEY_RIGHT":
+                x = clamp(x + 1, 0, ew)
+            case _:
+                pass
+        self.cur_piece.pos = x, y
+
+    def _spawn_piece(self):
+        shape = random.choice(SHAPES)
+        sym = random.choice(SYMBOLS)
+        w, _ = self.size
+        pos = w // 2, 0
+        p = Piece(shape, pos, sym, "")
+        self.cur_piece = p
+
+    def _place_piece(self):
+        p = self.cur_piece
+        self.placed_pieces.append(p)
+        self._spawn_piece()
+
+    def _is_piece(self, x: int, y: int):
+        return (x, y) in self.cur_piece.cells()
+
+    def render(self, term: Terminal) -> str:
+        buf = ""
+        W, H = self.size
+        for y in range(H):
             ibuf = ""
-            for x in range(self.width):
-                v = "@" if self._is_active(x, y) else " "
+            for x in range(W):
+                v = "@" if self._is_piece(x, y) else " "
                 D, B = term.dimgray, term.blue
                 ibuf += f"{D}[{B}{v}{D}]"
             buf += term.center(ibuf) + CRLF
@@ -80,50 +179,26 @@ class RainbowText:
         return term.center(buf) + term.normal + CRLF
 
 
-def clamp(value: int, min_val: int, max_val: int):
-    if value < min_val:
-        return min_val
-    elif value > max_val:
-        return max_val
-    return value
-
-
 class Game:
     board: Board[int]
-    x: int
-    y: int
     heading: RainbowText
     line: RainbowText
     running: bool
 
     def __init__(self) -> None:
-        w, h = GRID_SIZE
-        self.x, self.y = w // 2, 0
         self.running = True
-        self.board = Board(w, h)
-        self.heading = RainbowText("TETRIS", space=1)
+        self.board = Board(GRID_SIZE)
+        self.heading = RainbowText("★TETRIS★", space=1)
         self.line = RainbowText("─" * 15)
 
     def update(self, key: Keystroke):
         if key == "q":
             self.running = False
             return
-        h, w = self.board.height, self.board.width
-        match key.name:
-            case "KEY_UP":
-                self.y = clamp(self.y - 1, 0, h - 1)
-            case "KEY_DOWN":
-                self.y = clamp(self.y + 1, 0, h - 1)
-            case "KEY_LEFT":
-                self.x = clamp(self.x - 1, 0, w - 1)
-            case "KEY_RIGHT":
-                self.x = clamp(self.x + 1, 0, w - 1)
-            case _:
-                pass
 
         self.heading.update()
         self.line.update()
-        self.board.update(self.x, self.y)
+        self.board.update(key)
 
     def render(self, term: Terminal) -> str:
         buf = ""
