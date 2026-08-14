@@ -134,8 +134,10 @@ class Board[T]:
         self.placed_pieces.append(p)
         self._spawn_piece()
 
-    def _is_piece(self, x: int, y: int):
-        return (x, y) in self.cur_piece.cells()
+    def _is_piece(self, x: int, y: int) -> Piece | None:
+        if (x, y) in self.cur_piece.cells():
+            return self.cur_piece
+        return None
 
     def render(self, term: Terminal) -> Buffer:
         W, H = self.size
@@ -143,7 +145,7 @@ class Board[T]:
         for y in range(H):
             ibuf = ""
             for x in range(W):
-                v = "@" if self._is_piece(x, y) else " "
+                v = p.sym if (p := self._is_piece(x, y)) else " "
                 D, B = term.dimgray, term.blue
                 ibuf += f"{D}[{B}{v}{D}]"
             buf[y] = term.center(ibuf)
