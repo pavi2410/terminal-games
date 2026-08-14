@@ -56,7 +56,7 @@ class Piece:
     sym: str
     color: str
 
-    def __init__(self, shape: list[list[int]], pos: Coord, sym: str, color: str):
+    def __init__(self, shape: Shape, pos: Coord, sym: str, color: str):
         self.shape = shape
         self.pos = pos
         self.sym = sym
@@ -75,7 +75,7 @@ class Piece:
     def cells(self) -> list[Coord]:
         s = self.shape
         x, y = self.pos
-        M, N = len(s), len(s[0])
+        M, N = self.size()
         return [
             (x + dx, y + dy) for dx in range(M) for dy in range(N) if s[dx][dy] != 0
         ]
