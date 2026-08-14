@@ -94,16 +94,6 @@ class Piece:
             for k, g in itertools.groupby(cells, lambda c: c[0])
         ]
 
-    def render(self, term: Terminal) -> Buffer:
-        M, N = self.size()
-        buf = [""] * M
-        for x in range(M):
-            for y in range(N):
-                v = self.shape[x][y]
-                c = term.red("#") if v != 0 else "."
-                buf[x] += c
-        return buf
-
 
 class Board[T]:
     grid: Mat[T | None]
