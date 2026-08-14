@@ -21,6 +21,7 @@ SHAPES: list[Shape] = [
     [[1, 1, 0], [0, 1, 1]],
     [[1, 1, 1, 1]],
     [[1, 1], [1, 1]],
+    [[1, 0], [1, 0], [1, 1]],
     [[1, 0, 1], [1, 1, 1]],
 ]
 SYMBOLS = "#@X0"
@@ -99,6 +100,10 @@ class Board[T]:
         self.grid[i][j] = v
 
     def update(self, key: Keystroke):
+        if key == " ":
+            self.cur_piece = self.cur_piece.rotate_cw()
+            return
+
         w, h = self.size
         pw, ph = self.cur_piece.size()
         ew, eh = w - pw, h - ph
