@@ -8,6 +8,7 @@ type Size = tuple[int, int]
 type Mat[T] = list[list[T]]
 type Shape = Mat[int]
 type Coord = tuple[int, int]
+type Buffer = list[str]
 
 
 CRLF = "\r\n"
@@ -25,7 +26,7 @@ SHAPES: list[Shape] = [
 SYMBOLS = "#@X0"
 
 
-def new_mat[T](size: Size, default: T | None = None) -> Mat[T | None]:
+def new_mat[T](size: Size, default: T) -> Mat[T]:
     M, N = size
     return [[default for _ in range(M)] for _ in range(N)]
 
@@ -68,16 +69,14 @@ class Piece:
             (x + dx, y + dy) for dx in range(M) for dy in range(N) if s[dx][dy] != 0
         ]
 
-    def render(self, term: Terminal) -> str:
-        buf = ""
-        M = len(self.shape)
-        N = len(self.shape[0])
+    def render(self, term: Terminal) -> Buffer:
+        M, N = self.size()
+        buf = [""] * M
         for x in range(M):
             for y in range(N):
                 v = self.shape[x][y]
                 c = term.red("#") if v != 0 else "."
-                buf += c
-            buf += CRLF
+                buf[x] += c
         return buf
 
 
@@ -89,7 +88,7 @@ class Board[T]:
 
     def __init__(self, size: Size) -> None:
         self.size = size
-        self.grid = new_mat(size)
+        self.grid = new_mat(size, None)
         self.placed_pieces = []
         self._spawn_piece()
 
@@ -133,17 +132,17 @@ class Board[T]:
     def _is_piece(self, x: int, y: int):
         return (x, y) in self.cur_piece.cells()
 
-    def render(self, term: Terminal) -> str:
-        buf = ""
+    def render(self, term: Terminal) -> Buffer:
         W, H = self.size
+        buf = [""] * H
         for y in range(H):
             ibuf = ""
             for x in range(W):
                 v = "@" if self._is_piece(x, y) else " "
                 D, B = term.dimgray, term.blue
                 ibuf += f"{D}[{B}{v}{D}]"
-            buf += term.center(ibuf) + CRLF
-        return buf + term.normal
+            buf[y] = term.center(ibuf)
+        return buf
 
 
 class RainbowText:
@@ -159,7 +158,7 @@ class RainbowText:
     def update(self):
         self.tick += 1
 
-    def render(self, term: Terminal) -> str:
+    def render(self, term: Terminal) -> Buffer:
         colors = [
             term.bright_red,
             term.bright_orange,
@@ -176,7 +175,7 @@ class RainbowText:
             k = (-base + i) % N
             a = colors[k]
             buf += a + b + (" " * self.space)
-        return term.center(buf) + term.normal + CRLF
+        return [term.center(buf) + term.normal]
 
 
 class Game:
@@ -200,14 +199,15 @@ class Game:
         self.line.update()
         self.board.update(key)
 
-    def render(self, term: Terminal) -> str:
-        buf = ""
-        buf += self.line.render(term)
-        buf += self.heading.render(term)
-        buf += self.line.render(term)
-        buf += self.board.render(term)
-        buf += self.line.render(term)
-        return buf
+    def render(self, term: Terminal) -> Buffer:
+        renderables = [
+            self.line,
+            self.heading,
+            self.line,
+            self.board,
+            self.line,
+        ]
+        return [CRLF.join(r.render(term)) for r in renderables]
 
 
 def main():
@@ -216,7 +216,8 @@ def main():
         g = Game()
         while g.running:
             print(term.home + term.clear, end="")
-            print(g.render(term), end=CRLF)
+            buf = CRLF.join(g.render(term))
+            print(buf, end=CRLF)
             key = term.inkey(timeout=0)
             g.update(key)
             time.sleep(1 / FPS)
