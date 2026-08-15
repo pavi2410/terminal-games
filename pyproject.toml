@@ -1,7 +1,7 @@
 [project]
-name = "tetris"
+name = "terminal-games"
 version = "0.1.0"
-description = "Add your description here"
+description = "Collection of hand-coded terminal-based games"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
