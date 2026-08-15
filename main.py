@@ -129,12 +129,20 @@ class Board:
     cur_piece: Piece
     _last_time: float
     _board_style: BoardStyle
+    _pieces_spawned: int
+    _rows_cleared: int
+    _all_cleared: int
+    _play_time: int
 
     def __init__(self, size: Size) -> None:
         self.size = size
         self.grid = new_mat(size, None)
         self._last_time = time.perf_counter()
         self._board_style = BoardStyle.Minimal
+        self._pieces_spawned = 0
+        self._rows_cleared = 0
+        self._all_cleared = 0
+        self._play_time = 0
         self._spawn_piece()
 
     def _move_piece(self, dir: Coord):
@@ -179,6 +187,8 @@ class Board:
             self.grid[y + 1] = self.grid[y]
         self.grid[0] = [None] * w
 
+        self._rows_cleared += 1
+
     def _cycle_block_style(self):
         match self._board_style:
             case BoardStyle.Minimal:
@@ -208,6 +218,8 @@ class Board:
 
         if row := self._check_row_filled():
             self._eat_cells_in_row(row)
+            if all(c is None for r in self.grid for c in r):
+                self._all_cleared += 1
 
         match key:
             case " ":
@@ -229,6 +241,8 @@ class Board:
         cell = (sym, color)
         p = Piece(shape, pos, cell)
         self.cur_piece = p
+
+        self._pieces_spawned += 1
 
     def _place_piece(self):
         p = self.cur_piece
@@ -272,6 +286,15 @@ class Board:
             case BoardStyle.Symbol:
                 return f"{D}[ ]"
 
+    def _render_stats(self, term: Terminal) -> Buffer:
+        D, W = term.dimgray, term.white
+        stats = [
+            f"pieces spawned {W(str(self._pieces_spawned))}",
+            f"rows cleared {W(str(self._rows_cleared))}",
+            f"all cleared {W(str(self._all_cleared))}",
+        ]
+        return [term.center(D(l)) for l in stats]
+
     def render(self, term: Terminal) -> Buffer:
         W, H = self.size
         buf = [""] * H
@@ -283,7 +306,7 @@ class Board:
                 else:
                     ibuf += self._render_cell_empty(term)
             buf[y] = term.center(ibuf)
-        return buf
+        return buf + self._render_stats(term)
 
 
 class AnimtedText:
