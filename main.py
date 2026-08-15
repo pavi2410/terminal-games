@@ -98,13 +98,11 @@ class Board:
     grid: Mat[Cell | None]
     size: Size
     cur_piece: Piece
-    placed_pieces: list[Piece]
     _last_time: float
 
     def __init__(self, size: Size) -> None:
         self.size = size
         self.grid = new_mat(size, None)
-        self.placed_pieces = []
         self._last_time = time.perf_counter()
         self._spawn_piece()
 
@@ -122,24 +120,20 @@ class Board:
         dir = DIRS["KEY_DOWN"]
         self._move_piece(dir)
 
-    def _bottom_touched(self) -> bool:
+    def _is_colliding(self) -> bool:
         # bottom edge cells of the current piece
         # select the cells whose y is max
         cpc_bottom = set(self.cur_piece.bottom_edge_cells(1))
 
-        # top edge cells of the placed pieces
-        # select the cells whose y is min
-        for piece in self.placed_pieces:
-            pc_top = set(piece.top_edge_cells())
-            if not cpc_bottom.isdisjoint(pc_top):
-                return True
-
-        # coords of the board floor
         w, h = self.size
-        floor_cells = {(x, h) for x in range(w)}
+        # coords of the board floor
+        floor_cells = [(x, h) for x in range(w)]
+        # coords of all the placed cells
+        filled_cells = [(x, y) for x in range(w) for y in range(h) if self.grid[y][x]]
+        bound_cells = set(floor_cells + filled_cells)
 
         # check overlap
-        return not cpc_bottom.isdisjoint(floor_cells)
+        return not cpc_bottom.isdisjoint(bound_cells)
 
     def _check_row_filled(self) -> int | None:
         for y, row in enumerate(self.grid):
@@ -166,7 +160,7 @@ class Board:
             self._last_time = now
             self._fall_piece()
 
-        if self._bottom_touched():
+        if self._is_colliding():
             self._place_piece()
 
         if row := self._check_row_filled():
@@ -191,7 +185,6 @@ class Board:
 
     def _place_piece(self):
         p = self.cur_piece
-        self.placed_pieces.append(p)
         for x, y in p.abs_cell_coords():
             self.grid[y][x] = p.cell
         self._spawn_piece()
