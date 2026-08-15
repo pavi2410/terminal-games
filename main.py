@@ -250,15 +250,29 @@ class AnimtedText:
             self._tick += 1
 
     def render(self, term: Terminal) -> Buffer:
-        buf = ""
-        N = len(self.colors)
-        CW = self.colorwidth or 1
-        base = self._tick % N
-        for i, b in enumerate(self.text):
-            k = (-base + i) // CW % N
-            a = cast(str, getattr(term, self.colors[k]))
-            buf += a + b + (" " * self.space)
+        buf = rainbow_text(
+            term, self.text, self.colors, self.colorwidth, self.space, self._tick
+        )
         return [term.center(buf) + term.normal]
+
+
+def rainbow_text(
+    term: Terminal,
+    text: str,
+    colors: list[str] = COLORS,
+    colorwidth: int = 1,
+    space: int = 0,
+    tick: int = 0,
+) -> str:
+    buf = ""
+    N = len(colors)
+    CW = colorwidth or 1
+    base = tick % N
+    for i, b in enumerate(text):
+        k = (-base + i) // CW % N
+        a = cast(str, getattr(term, colors[k]))
+        buf += a + b + (" " * space)
+    return buf
 
 
 class GameState(Enum):
@@ -322,6 +336,7 @@ class Game:
 
 def main():
     term = Terminal()
+    print(term.center(rainbow_text(term, "TETRIS!")))
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
         global game_instance
         game_instance = Game()
