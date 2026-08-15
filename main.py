@@ -392,7 +392,16 @@ class Game:
                 self.state = GameState.OVER
 
     def render(self, term: Terminal) -> Buffer:
-        buf = term.center("Use ← → ↓ / A S D keys to move the piece")
+        D, W = term.dimgray, term.white
+        instructions = [
+            f"Use {W('← → ↓')} / {W('A S D')} keys to move the piece",
+            f"Use {W('⎵ space bar')} to rotate piece clockwise ⟳",
+            "q quit",
+            "r reset",
+            f"p {'pause' if self.state != GameState.PAUSED else 'resume'}",
+            f"t cycle styles {W(self.board._board_style.name)}",  # pyright: ignore[reportPrivateUsage]
+        ]
+        buf = [term.center(D(l)) for l in instructions]
         renderables = [
             self.line,
             self.heading,
@@ -400,7 +409,7 @@ class Game:
             self.board,
             self.line,
         ]
-        return [CRLF.join(r.render(term)) for r in renderables] + [buf]
+        return [CRLF.join(r.render(term)) for r in renderables] + buf
 
 
 def gradient_h(term: Terminal, n: int) -> str:
