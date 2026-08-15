@@ -56,6 +56,10 @@ def clamp(value: int, min_val: int, max_val: int) -> int:
     return value
 
 
+def sign(x: int):
+    return (x > 0) - (x < 0)
+
+
 class Piece:
     shape: Shape
     pos: Coord
@@ -268,10 +272,17 @@ def rainbow_text(
     N = len(colors)
     CW = colorwidth or 1
     base = tick % N
+    space_dir = sign(space)
+    space = abs(space)
     for i, b in enumerate(text):
         k = (-base + i) // CW % N
         a = cast(str, getattr(term, colors[k]))
-        buf += a + b + (" " * space)
+        s = " " * space
+        if space_dir == -1:
+            buf += s
+        buf += a + b
+        if space_dir == 1:
+            buf += s
     return buf
 
 
@@ -334,17 +345,40 @@ class Game:
         return [CRLF.join(r.render(term)) for r in renderables]
 
 
+def tetris(term: Terminal, n: int) -> str:
+    buf = ""
+    for c in itertools.islice(itertools.cycle(COLORS), n):
+        c = cast(str, getattr(term, f"on_{c}"))
+        buf += c + "  "
+    return buf + term.normal
+
+
+def center_buffer(term: Terminal, buf: Buffer) -> Buffer:
+    return [term.center(l) for l in buf]
+
+
+def print_buffer(buf: Buffer, eol: bool = False):
+    print(CRLF.join(buf), end=CRLF if eol else "")
+
+
 def main():
     term = Terminal()
-    print(term.center(rainbow_text(term, "TETRIS!")))
+
+    print_buffer(
+        center_buffer(
+            term,
+            [tetris(term, 7), rainbow_text(term, "TETRIS!", space=-1), tetris(term, 7)],
+        )
+    )
+
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
         global game_instance
         game_instance = Game()
         frame_dur = 1 / FPS
         while game_instance.state != GameState.QUIT:
             print(term.home + term.clear, end="")
-            buf = CRLF.join(game_instance.render(term))
-            print(buf, end=CRLF)
+            buf = game_instance.render(term)
+            print_buffer(buf)
             key = term.inkey(timeout=0)
             game_instance.update(key)
             time.sleep(frame_dur)
