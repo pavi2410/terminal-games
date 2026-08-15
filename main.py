@@ -228,13 +228,17 @@ class AnimtedText:
     text: str
     space: int
     colors: list[str]
+    colorwidth: int
     _tick: int
     _is_animating: bool
 
-    def __init__(self, text: str, space: int = 0, colors: list[str] = COLORS):
+    def __init__(
+        self, text: str, space: int = 0, colors: list[str] = COLORS, colorwidth: int = 1
+    ):
         self.text = text
         self.space = space
         self.colors = colors
+        self.colorwidth = colorwidth
         self._tick = 0
         self._is_animating = True
 
@@ -248,9 +252,10 @@ class AnimtedText:
     def render(self, term: Terminal) -> Buffer:
         buf = ""
         N = len(self.colors)
+        CW = self.colorwidth or 1
         base = self._tick % N
         for i, b in enumerate(self.text):
-            k = (-base + i) % N
+            k = (-base + i) // CW % N
             a = cast(str, getattr(term, self.colors[k]))
             buf += a + b + (" " * self.space)
         return [term.center(buf) + term.normal]
@@ -277,7 +282,7 @@ class Game:
         grid_w, _ = GRID_SIZE
         cell_w = 3
         self.heading = AnimtedText(s + "TETRIS".center(grid_w) + s, space=1)
-        self.line = AnimtedText("─" * grid_w * cell_w)
+        self.line = AnimtedText("─" * grid_w * cell_w, colorwidth=1)
 
     def update(self, key: Keystroke):
         match key:
