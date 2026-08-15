@@ -29,7 +29,7 @@ SHAPES: list[Shape] = [
     [[1, 0, 1], [1, 1, 1]],
 ]
 SYMBOLS = "#@X0"
-COLORS = ["red", "orange", "yellow", "green", "blue", "violet"]
+COLORS = ["red", "orange", "yellow", "green", "blue", "magenta", "violet"]
 
 DIRS = {
     "KEY_UP": (0, -1),
@@ -344,7 +344,7 @@ class Game:
         return [CRLF.join(r.render(term)) for r in renderables]
 
 
-def tetris(term: Terminal, n: int) -> str:
+def gradient_h(term: Terminal, n: int) -> str:
     buf = ""
     for c in itertools.islice(itertools.cycle(COLORS), n):
         c = cast(str, getattr(term, f"on_{c}"))
@@ -352,22 +352,29 @@ def tetris(term: Terminal, n: int) -> str:
     return buf + term.normal
 
 
-def center_buffer(term: Terminal, buf: Buffer) -> Buffer:
-    return [term.center(l) for l in buf]
-
-
-def print_buffer(buf: Buffer, eol: bool = False):
-    print(CRLF.join(buf), end=CRLF if eol else "")
+def print_buffer(term: Terminal, buf: Buffer, eol: bool = False, align: int = -1):
+    match sign(align):
+        case 0:  # center
+            buf = [term.center(l) for l in buf]
+        case 1:  # right
+            buf = [term.rjust(l) for l in buf]
+        case _:  # left
+            pass
+    print(CRLF.join(buf) + term.normal, end=CRLF if eol else "")
 
 
 def main():
     term = Terminal()
 
     print_buffer(
-        center_buffer(
-            term,
-            [tetris(term, 7), rainbow_text(term, "TETRIS!", space=-1), tetris(term, 7)],
-        )
+        term,
+        [
+            gradient_h(term, 7),
+            rainbow_text(term, "TETRIS!", space=-1),
+            gradient_h(term, 7),
+        ],
+        eol=True,
+        align=0,
     )
 
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
@@ -377,7 +384,7 @@ def main():
         while game_instance.state != GameState.QUIT:
             print(term.home + term.clear, end="")
             buf = game_instance.render(term)
-            print_buffer(buf)
+            print_buffer(term, buf)
             key = term.inkey(timeout=0)
             game_instance.update(key)
             time.sleep(frame_dur)
