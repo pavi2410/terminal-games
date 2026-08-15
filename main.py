@@ -419,10 +419,10 @@ class Game:
         instructions = [
             f"Use {W('← → ↓')} / {W('A S D')} keys to move the piece",
             f"Use {W('⎵ space bar')} to rotate piece clockwise ⟳",
-            "q quit",
-            "r reset",
-            f"p {'pause' if self.state != GameState.PAUSED else 'resume'}",
-            f"t cycle styles {W(self.board._board_style.name)}",  # pyright: ignore[reportPrivateUsage]
+            f"{W('q')} quit",
+            f"{W('r')} reset",
+            f"{W('p')} {'pause' if self.state != GameState.PAUSED else 'resume'}",
+            f"{W('t')} cycle styles {W(self.board._board_style.name)}",  # pyright: ignore[reportPrivateUsage]
         ]
         return [term.center(D(l)) for l in instructions]
 
