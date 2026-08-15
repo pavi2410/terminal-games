@@ -1,6 +1,7 @@
 import itertools
 import random
 import time
+from enum import Enum, auto
 from typing import cast
 
 from blessed import Terminal
@@ -36,6 +37,10 @@ DIRS = {
     "KEY_LEFT": (-1, 0),
     "KEY_RIGHT": (1, 0),
 }
+
+game_instance: Game | None = None
+
+GAME_OVER_EVENT = "_game-event::gameover"
 
 
 def new_mat[T](size: Size, default: T) -> Mat[T]:
@@ -166,6 +171,10 @@ class Board:
         if row := self._check_row_filled():
             self._eat_cells_in_row(row)
 
+        # check if top reached
+        if any(self.grid[0]):
+            return GAME_OVER_EVENT
+
         if key == " ":
             self.cur_piece = self.cur_piece.rotate_cw()
             return
@@ -239,14 +248,21 @@ class RainbowText:
         return [term.center(buf) + term.normal]
 
 
+class GameState(Enum):
+    RUNNING = auto()
+    QUIT = auto()
+    PAUSED = auto()
+    OVER = auto()
+
+
 class Game:
     board: Board
     heading: RainbowText
     line: RainbowText
-    running: bool
+    state: GameState
 
     def __init__(self) -> None:
-        self.running = True
+        self.state = GameState.RUNNING
         self.board = Board(GRID_SIZE)
 
         s = "★"
@@ -256,13 +272,28 @@ class Game:
         self.line = RainbowText("─" * grid_w * cell_w)
 
     def update(self, key: Keystroke):
-        if key == "q":
-            self.running = False
-            return
+        match key:
+            case "q":
+                self.state = GameState.QUIT
+                return
+            case "p":
+                self.state = (
+                    GameState.PAUSED
+                    if self.state != GameState.PAUSED
+                    else GameState.RUNNING
+                )
+            case "r":
+                global game_instance
+                game_instance = Game()
+            case _:
+                pass
 
         self.heading.update()
         self.line.update()
-        self.board.update(key)
+        if self.state not in (GameState.PAUSED, GameState.OVER):
+            e = self.board.update(key)
+            if e == GAME_OVER_EVENT:
+                self.state = GameState.OVER
 
     def render(self, term: Terminal) -> Buffer:
         renderables = [
@@ -278,14 +309,15 @@ class Game:
 def main():
     term = Terminal()
     with term.raw(), term.cbreak(), term.hidden_cursor(), term.fullscreen():
-        g = Game()
+        global game_instance
+        game_instance = Game()
         frame_dur = 1 / FPS
-        while g.running:
+        while game_instance.state != GameState.QUIT:
             print(term.home + term.clear, end="")
-            buf = CRLF.join(g.render(term))
+            buf = CRLF.join(game_instance.render(term))
             print(buf, end=CRLF)
             key = term.inkey(timeout=0)
-            g.update(key)
+            game_instance.update(key)
             time.sleep(frame_dur)
 
 
