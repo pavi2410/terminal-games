@@ -414,7 +414,7 @@ class Game:
             if e == GAME_OVER_EVENT:
                 self.state = GameState.OVER
 
-    def render(self, term: Terminal) -> Buffer:
+    def _render_instructions(self, term: Terminal) -> Buffer:
         D, W = term.dimgray, term.white
         instructions = [
             f"Use {W('← → ↓')} / {W('A S D')} keys to move the piece",
@@ -424,7 +424,9 @@ class Game:
             f"p {'pause' if self.state != GameState.PAUSED else 'resume'}",
             f"t cycle styles {W(self.board._board_style.name)}",  # pyright: ignore[reportPrivateUsage]
         ]
-        buf = [term.center(D(l)) for l in instructions]
+        return [term.center(D(l)) for l in instructions]
+
+    def render(self, term: Terminal) -> Buffer:
         renderables = [
             self.line,
             self.heading,
@@ -432,7 +434,9 @@ class Game:
             self.board,
             self.line,
         ]
-        return [CRLF.join(r.render(term)) for r in renderables] + buf
+        return [
+            CRLF.join(r.render(term)) for r in renderables
+        ] + self._render_instructions(term)
 
 
 def gradient_h(term: Terminal, n: int) -> str:
