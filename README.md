@@ -1,11 +1,13 @@
 # terminal-games
 
-## Collection
-
 - [x] Tetris (hand-coded - no AI tokens burned)
 - [ ] BlockBlast
 - [ ] Snake
 - [ ] Flappy Bird
+
+||
+|:---:|
+|<img width="636" height="880" alt="image" src="https://github.com/user-attachments/assets/04355753-2c41-4a71-b903-0b8fd655e5ac" />|
 
 ## Installation
 
