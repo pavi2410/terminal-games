@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import random
 import time
@@ -209,11 +210,11 @@ class Board:
         # at every tick (each update call)
         now = time.perf_counter()
         dt = now - self._last_time
-        # self._last_time = now
 
         # more than a second has passed
         if dt >= 1:
             self._last_time = now
+            self._play_time += 1
             self._fall_piece()
 
         if self._is_colliding():
@@ -295,6 +296,7 @@ class Board:
             f"pieces spawned {W(str(self._pieces_spawned))}",
             f"rows cleared {W(str(self._rows_cleared))}",
             f"all cleared {W(str(self._all_cleared))}",
+            f"play time {W(str(datetime.timedelta(seconds=self._play_time)))}",
         ]
         return [term.center(D(l)) for l in stats]
 
@@ -486,6 +488,8 @@ def main():
             key = term.inkey(timeout=0)
             game_instance.update(key)
             time.sleep(frame_dur)
+
+    print_buffer(term, game_instance.board._render_stats(term))  # pyright: ignore[reportPrivateUsage]
 
 
 if __name__ == "__main__":
