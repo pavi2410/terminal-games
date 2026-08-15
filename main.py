@@ -11,6 +11,7 @@ type Mat[T] = list[list[T]]
 type Shape = Mat[int]
 type Coord = tuple[int, int]
 type Buffer = list[str]
+type Cell = tuple[str, str]
 
 
 CRLF = "\r\n"
@@ -53,26 +54,24 @@ def clamp(value: int, min_val: int, max_val: int) -> int:
 class Piece:
     shape: Shape
     pos: Coord
-    sym: str
-    color: str
+    cell: Cell
 
-    def __init__(self, shape: Shape, pos: Coord, sym: str, color: str):
+    def __init__(self, shape: Shape, pos: Coord, cell: Cell):
         self.shape = shape
         self.pos = pos
-        self.sym = sym
-        self.color = color
+        self.cell = cell
 
     def rotate_cw(self) -> Piece:
         M, N = len(self.shape), len(self.shape[0])
         new_shape = [[self.shape[M - 1 - x][y] for x in range(M)] for y in range(N)]
-        return Piece(new_shape, self.pos, self.sym, self.color)
+        return Piece(new_shape, self.pos, self.cell)
 
     def size(self) -> Size:
         s = self.shape
         M, N = len(s), len(s[0])
         return M, N
 
-    def cells(self) -> list[Coord]:
+    def abs_cell_coords(self) -> list[Coord]:
         s = self.shape
         x, y = self.pos
         M, N = self.size()
@@ -81,22 +80,22 @@ class Piece:
         ]
 
     def top_edge_cells(self, y_offset: int = 0) -> list[Coord]:
-        cells = self.cells()
+        cells = self.abs_cell_coords()
         return [
             (k, min(g, key=lambda c: c[1])[1] + y_offset)
             for k, g in itertools.groupby(cells, lambda c: c[0])
         ]
 
     def bottom_edge_cells(self, y_offset: int = 0) -> list[Coord]:
-        cells = self.cells()
+        cells = self.abs_cell_coords()
         return [
             (k, max(g, key=lambda c: c[1])[1] + y_offset)
             for k, g in itertools.groupby(cells, lambda c: c[0])
         ]
 
 
-class Board[T]:
-    grid: Mat[T | None]
+class Board:
+    grid: Mat[Cell | None]
     size: Size
     cur_piece: Piece
     placed_pieces: list[Piece]
@@ -108,12 +107,6 @@ class Board[T]:
         self.placed_pieces = []
         self._last_time = time.perf_counter()
         self._spawn_piece()
-
-    def get(self, i: int, j: int) -> T | None:
-        return self.grid[i][j]
-
-    def set(self, i: int, j: int, v: T | None):
-        self.grid[i][j] = v
 
     def _move_piece(self, dir: Coord):
         w, h = self.size
@@ -148,6 +141,20 @@ class Board[T]:
         # check overlap
         return not cpc_bottom.isdisjoint(floor_cells)
 
+    def _check_row_filled(self) -> int | None:
+        for y, row in enumerate(self.grid):
+            # all cells in rows are filled
+            if all(row):
+                return y
+        return None
+
+    def _eat_cells_in_row(self, row: int):
+        w, _ = self.size
+        # move cells downward bottom-up
+        for y in reversed(range(row)):
+            self.grid[y + 1] = self.grid[y]
+        self.grid[0] = [None] * w
+
     def update(self, key: Keystroke):
         # at every tick (each update call)
         now = time.perf_counter()
@@ -162,6 +169,9 @@ class Board[T]:
         if self._bottom_touched():
             self._place_piece()
 
+        if row := self._check_row_filled():
+            self._eat_cells_in_row(row)
+
         if key == " ":
             self.cur_piece = self.cur_piece.rotate_cw()
             return
@@ -175,22 +185,24 @@ class Board[T]:
         color = random.choice(COLORS)
         w, _ = self.size
         pos = w // 2, 0
-        p = Piece(shape, pos, sym, color)
+        cell = (sym, color)
+        p = Piece(shape, pos, cell)
         self.cur_piece = p
 
     def _place_piece(self):
         p = self.cur_piece
         self.placed_pieces.append(p)
+        for x, y in p.abs_cell_coords():
+            self.grid[y][x] = p.cell
         self._spawn_piece()
 
-    def _is_piece(self, x: int, y: int) -> Piece | None:
+    def _is_cell(self, x: int, y: int) -> Cell | None:
         coord = x, y
         cp = self.cur_piece
-        if coord in cp.cells():
-            return cp
-        for piece in self.placed_pieces:
-            if coord in piece.cells():
-                return piece
+        if coord in cp.abs_cell_coords():
+            return cp.cell
+        if cell := self.grid[y][x]:
+            return cell
         return None
 
     def render(self, term: Terminal) -> Buffer:
@@ -200,9 +212,9 @@ class Board[T]:
             ibuf = ""
             for x in range(W):
                 D = term.dimgray
-                if p := self._is_piece(x, y):
-                    s = p.sym
-                    c = cast(str, getattr(term, p.color))
+                if cell := self._is_cell(x, y):
+                    s, c = cell
+                    c = cast(str, getattr(term, c))
                     ibuf += f"{D}[{c}{s}{D}]"
                 else:
                     ibuf += f"{D}[ ]"
@@ -235,7 +247,7 @@ class RainbowText:
 
 
 class Game:
-    board: Board[int]
+    board: Board
     heading: RainbowText
     line: RainbowText
     running: bool
