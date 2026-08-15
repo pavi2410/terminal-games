@@ -234,7 +234,7 @@ class AnimtedText:
     colors: list[str]
     colorwidth: int
     _tick: int
-    _is_animating: bool
+    _anim_speed: int
 
     def __init__(
         self, text: str, space: int = 0, colors: list[str] = COLORS, colorwidth: int = 1
@@ -244,14 +244,13 @@ class AnimtedText:
         self.colors = colors
         self.colorwidth = colorwidth
         self._tick = 0
-        self._is_animating = True
+        self._anim_speed = 1
 
-    def animate(self, value: bool):
-        self._is_animating = value
+    def animate(self, value: int):
+        self._anim_speed = value
 
     def update(self):
-        if self._is_animating:
-            self._tick += 1
+        self._tick += self._anim_speed
 
     def render(self, term: Terminal) -> Buffer:
         buf = rainbow_text(
@@ -307,7 +306,7 @@ class Game:
         grid_w, _ = GRID_SIZE
         cell_w = 3
         self.heading = AnimtedText(s + "TETRIS".center(grid_w) + s, space=1)
-        self.line = AnimtedText("─" * grid_w * cell_w, colorwidth=1)
+        self.line = AnimtedText("─" * grid_w * cell_w, colorwidth=4)
 
     def update(self, key: Keystroke):
         match key:
@@ -317,10 +316,10 @@ class Game:
             case "p":
                 if self.state == GameState.PAUSED:
                     self.state = GameState.RUNNING
-                    self.line.animate(True)
+                    self.line.animate(1)
                 else:
                     self.state = GameState.PAUSED
-                    self.line.animate(False)
+                    self.line.animate(0)
             case "r":
                 global game_instance
                 game_instance = Game()
