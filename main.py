@@ -155,6 +155,10 @@ class Board:
         self.grid[0] = [None] * w
 
     def update(self, key: Keystroke):
+        # check if top reached
+        if any(self.grid[0]):
+            return GAME_OVER_EVENT
+
         # at every tick (each update call)
         now = time.perf_counter()
         dt = now - self._last_time
@@ -170,10 +174,6 @@ class Board:
 
         if row := self._check_row_filled():
             self._eat_cells_in_row(row)
-
-        # check if top reached
-        if any(self.grid[0]):
-            return GAME_OVER_EVENT
 
         if key == " ":
             self.cur_piece = self.cur_piece.rotate_cw()
