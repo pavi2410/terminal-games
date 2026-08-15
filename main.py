@@ -31,12 +31,29 @@ SHAPES: list[Shape] = [
 SYMBOLS = "#@X0"
 COLORS = ["red", "orange", "yellow", "green", "blue", "magenta", "violet"]
 
-DIRS = {
-    "KEY_UP": (0, -1),
-    "KEY_DOWN": (0, 1),
-    "KEY_LEFT": (-1, 0),
-    "KEY_RIGHT": (1, 0),
-}
+
+class Direction(tuple[int, int], Enum):
+    UP = (0, -1)
+    DOWN = (0, 1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+
+    @classmethod
+    def from_key(cls, key: str):
+        dir = None
+        match key:
+            case "KEY_UP" | "w":
+                dir = Direction.UP
+            case "KEY_DOWN" | "s":
+                dir = Direction.DOWN
+            case "KEY_LEFT" | "a":
+                dir = Direction.LEFT
+            case "KEY_RIGHT" | "d":
+                dir = Direction.RIGHT
+            case _:
+                raise ValueError(f"Invalid direction key: '{key!r}'")
+        return dir
+
 
 game_instance: Game | None = None
 
@@ -126,8 +143,7 @@ class Board:
         self.cur_piece.pos = x, y
 
     def _fall_piece(self):
-        dir = DIRS["KEY_DOWN"]
-        self._move_piece(dir)
+        self._move_piece(Direction.DOWN)
 
     def _is_colliding(self) -> bool:
         # bottom edge cells of the current piece
@@ -183,7 +199,7 @@ class Board:
             self.cur_piece = self.cur_piece.rotate_cw()
             return
 
-        if key.name and (dir := DIRS.get(key.name)):
+        if key.name and (dir := Direction.from_key(key.name)) and dir != Direction.UP:
             self._move_piece(dir)
 
     def _spawn_piece(self):
@@ -334,6 +350,7 @@ class Game:
                 self.state = GameState.OVER
 
     def render(self, term: Terminal) -> Buffer:
+        buf = term.center("Use ← → ↓ / A S D keys to move the piece")
         renderables = [
             self.line,
             self.heading,
@@ -341,7 +358,7 @@ class Game:
             self.board,
             self.line,
         ]
-        return [CRLF.join(r.render(term)) for r in renderables]
+        return [CRLF.join(r.render(term)) for r in renderables] + [buf]
 
 
 def gradient_h(term: Terminal, n: int) -> str:
