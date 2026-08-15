@@ -105,13 +105,6 @@ class Piece:
             (x + dx, y + dy) for dx in range(M) for dy in range(N) if s[dx][dy] != 0
         ]
 
-    def top_edge_cells(self, y_offset: int = 0) -> list[Coord]:
-        cells = self.abs_cell_coords()
-        return [
-            (k, min(g, key=lambda c: c[1])[1] + y_offset)
-            for k, g in itertools.groupby(cells, lambda c: c[0])
-        ]
-
     def bottom_edge_cells(self, y_offset: int = 0) -> list[Coord]:
         cells = self.abs_cell_coords()
         return [
