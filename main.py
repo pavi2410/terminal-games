@@ -224,26 +224,34 @@ class Board:
         return buf
 
 
-class RainbowText:
+class AnimtedText:
     text: str
     space: int
-    tick: int
+    colors: list[str]
+    _tick: int
+    _is_animating: bool
 
-    def __init__(self, text: str, space: int = 0):
+    def __init__(self, text: str, space: int = 0, colors: list[str] = COLORS):
         self.text = text
         self.space = space
-        self.tick = 0
+        self.colors = colors
+        self._tick = 0
+        self._is_animating = True
+
+    def animate(self, value: bool):
+        self._is_animating = value
 
     def update(self):
-        self.tick += 1
+        if self._is_animating:
+            self._tick += 1
 
     def render(self, term: Terminal) -> Buffer:
         buf = ""
-        N = len(COLORS)
-        base = self.tick % N
+        N = len(self.colors)
+        base = self._tick % N
         for i, b in enumerate(self.text):
             k = (-base + i) % N
-            a = cast(str, getattr(term, COLORS[k]))
+            a = cast(str, getattr(term, self.colors[k]))
             buf += a + b + (" " * self.space)
         return [term.center(buf) + term.normal]
 
@@ -257,8 +265,8 @@ class GameState(Enum):
 
 class Game:
     board: Board
-    heading: RainbowText
-    line: RainbowText
+    heading: AnimtedText
+    line: AnimtedText
     state: GameState
 
     def __init__(self) -> None:
@@ -268,8 +276,8 @@ class Game:
         s = "★"
         grid_w, _ = GRID_SIZE
         cell_w = 3
-        self.heading = RainbowText(s + "TETRIS".center(grid_w) + s, space=1)
-        self.line = RainbowText("─" * grid_w * cell_w)
+        self.heading = AnimtedText(s + "TETRIS".center(grid_w) + s, space=1)
+        self.line = AnimtedText("─" * grid_w * cell_w)
 
     def update(self, key: Keystroke):
         match key:
@@ -277,11 +285,12 @@ class Game:
                 self.state = GameState.QUIT
                 return
             case "p":
-                self.state = (
-                    GameState.PAUSED
-                    if self.state != GameState.PAUSED
-                    else GameState.RUNNING
-                )
+                if self.state == GameState.PAUSED:
+                    self.state = GameState.RUNNING
+                    self.line.animate(True)
+                else:
+                    self.state = GameState.PAUSED
+                    self.line.animate(False)
             case "r":
                 global game_instance
                 game_instance = Game()
