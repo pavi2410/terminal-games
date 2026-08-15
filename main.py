@@ -20,7 +20,6 @@ FPS = 10
 GRID_SIZE: Size = 10, 20
 ORIGIN: Coord = 0, 0
 
-
 SHAPES: list[Shape] = [
     [[1, 1, 0], [0, 1, 1]],
     [[1, 1, 1, 1]],
@@ -30,6 +29,17 @@ SHAPES: list[Shape] = [
 ]
 SYMBOLS = "#@X0"
 COLORS = ["red", "orange", "yellow", "green", "blue", "magenta", "violet"]
+
+
+class BoardStyle(Enum):
+    Minimal = ("  ", False, True)
+    Brick = ("[]", False, True)
+    Symbol = ("#@X0", True, False)
+
+    def __init__(self, symbols: str, fg: bool, bg: bool):
+        self.symbols = symbols
+        self.fg = fg
+        self.bg = bg
 
 
 class Direction(tuple[int, int], Enum):
@@ -118,11 +128,13 @@ class Board:
     size: Size
     cur_piece: Piece
     _last_time: float
+    _board_style: BoardStyle
 
     def __init__(self, size: Size) -> None:
         self.size = size
         self.grid = new_mat(size, None)
         self._last_time = time.perf_counter()
+        self._board_style = BoardStyle.Minimal
         self._spawn_piece()
 
     def _move_piece(self, dir: Coord):
@@ -167,6 +179,15 @@ class Board:
             self.grid[y + 1] = self.grid[y]
         self.grid[0] = [None] * w
 
+    def _cycle_block_style(self):
+        match self._board_style:
+            case BoardStyle.Minimal:
+                self._board_style = BoardStyle.Brick
+            case BoardStyle.Brick:
+                self._board_style = BoardStyle.Symbol
+            case BoardStyle.Symbol:
+                self._board_style = BoardStyle.Minimal
+
     def update(self, key: Keystroke):
         # check if top reached
         if any(self.grid[0]):
@@ -188,9 +209,13 @@ class Board:
         if row := self._check_row_filled():
             self._eat_cells_in_row(row)
 
-        if key == " ":
-            self.cur_piece = self.cur_piece.rotate_cw()
-            return
+        match key:
+            case " ":
+                self.cur_piece = self.cur_piece.rotate_cw()
+            case "t":
+                self._cycle_block_style()
+            case _:
+                pass
 
         if key.name and (dir := Direction.from_key(key.name)) and dir != Direction.UP:
             self._move_piece(dir)
@@ -220,19 +245,43 @@ class Board:
             return cell
         return None
 
+    def _render_cell_filled(self, term: Terminal, cell: Cell) -> str:
+        bs = self._board_style
+        sym, color = cell
+        D, R = term.dimgray, term.normal
+        if bs.fg:
+            color = cast(str, getattr(term, color))
+        elif bs.bg:
+            color = cast(str, getattr(term, f"on_{color}"))
+
+        match bs:
+            case BoardStyle.Minimal:
+                return f"{color}  {R}"
+            case BoardStyle.Brick:
+                return f"{color}[]{R}"
+            case BoardStyle.Symbol:
+                return f"{D}[{color}{sym}{D}]"
+
+    def _render_cell_empty(self, term: Terminal) -> str:
+        D, _R = term.dimgray, term.normal
+        match bs := self._board_style:
+            case BoardStyle.Minimal:
+                return f"{D}  "
+            case BoardStyle.Brick:
+                return f"{D}{bs.symbols}"
+            case BoardStyle.Symbol:
+                return f"{D}[ ]"
+
     def render(self, term: Terminal) -> Buffer:
         W, H = self.size
         buf = [""] * H
         for y in range(H):
             ibuf = ""
             for x in range(W):
-                D = term.dimgray
                 if cell := self._is_cell(x, y):
-                    s, c = cell
-                    c = cast(str, getattr(term, c))
-                    ibuf += f"{D}[{c}{s}{D}]"
+                    ibuf += self._render_cell_filled(term, cell)
                 else:
-                    ibuf += f"{D}[ ]"
+                    ibuf += self._render_cell_empty(term)
             buf[y] = term.center(ibuf)
         return buf
 
