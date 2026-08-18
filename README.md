@@ -3,6 +3,7 @@
 - [x] Tetris (hand-coded - no AI tokens burned)
 - [ ] BlockBlast
 - [ ] Snake
+- [ ] Bricks Breaker
 - [ ] Flappy Bird
 
 ||
